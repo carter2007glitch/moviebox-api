@@ -5,7 +5,7 @@ A complete Node.js Express API server that provides full access to MovieBox cont
 ## Features
 
 - **Real Movie & TV Search** - Search the complete MovieBox database with live results
-- **Detailed Information** - Get comprehensive movie/series metadata including cast, ratings, descriptions
+- **Detailed Information** -  Get comprehensive movie/series metadata including cast, ratings, descriptions
 - **Working Download Links** - Access real download sources in multiple qualities (360p - 1080p)
 - **Trending Content** - Live trending movies and TV series data
 - **Homepage Content** - Featured movies and recommendations
