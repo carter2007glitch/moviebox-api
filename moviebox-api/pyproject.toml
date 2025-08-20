@@ -1,0 +1,75 @@
+[project]
+name = "moviebox-api"
+version = "0.2.6"
+description = "Unofficial wrapper for moviebox.ph - search, discover and download movies, tv-series and their subtitles."
+readme = "README.md"
+license="Unlicense"
+authors = [
+    { name = "smartwa", email = "smartwacaleb@gmail.com" }
+]
+requires-python = ">=3.10"
+classifiers = [
+    "License :: OSI Approved :: The Unlicense (Unlicense)",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: File Sharing",
+]
+dependencies = [
+    "bs4>=0.0.2",
+    "httpx>=0.28.1",
+    "pydantic>=2.11.7",
+    "throttlebuster==0.1.8",
+]
+
+[project.scripts]
+moviebox-api = "moviebox_api.cli.interface:main"
+moviebox = "moviebox_api.cli.interface:main"
+
+[project.urls]
+homepage = "https://github.com/Simatwa/moviebox-api"
+repository = "https://github.com/Simatwa/moviebox-api"
+documentation = "https://github.com/Simatwa/moviebox-api"
+
+[project.optional-dependencies]
+cli = [
+    "click>=8.2.1",
+    "rich>=14.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "coverage>=7.10.4",
+    "coverage-badge>=1.1.2",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.0.0",
+    "ruff>=0.12.8",
+]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = [
+    "E",      # https://docs.astral.sh/ruff/rules/#error-e
+    "F",      # https://docs.astral.sh/ruff/rules/#pyflakes-f
+    "I",      # https://docs.astral.sh/ruff/rules/#isort-i
+    "FA",     # https://docs.astral.sh/ruff/rules/#flake8-future-annotations-fa
+    "UP",     # https://docs.astral.sh/ruff/rules/#pyupgrade-up
+    "RUF100", # https://docs.astral.sh/ruff/rules/#ruff-specific-rules-ruf
+]
+ignore = [
+    "UP031",  # https://docs.astral.sh/ruff/rules/printf-string-formatting/
+    "F401"    # https://docs.astral.sh/ruff/rules/unused-import
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
