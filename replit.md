@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a minimal Node.js console application that serves as a basic "Hello World" program. The project demonstrates the simplest possible JavaScript execution environment, printing a greeting message to the console. This appears to be either a starter template or a foundational project that could be extended with additional functionality.
+This is a Node.js Express API server that provides access to MovieBox content through RESTful endpoints. The application serves as a JavaScript conversion of the original Python moviebox-api library, offering functionality to search for movies and TV series, get trending content, retrieve detailed information, and fetch streaming sources.
 
 ## User Preferences
 
@@ -11,33 +11,57 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 **Runtime Environment**
-- Node.js-based application using JavaScript
-- Single-file architecture with minimal complexity
-- Console-based output mechanism
-- No external dependencies or frameworks
+- Node.js 20.x with Express.js framework
+- RESTful API architecture serving JSON responses
+- Cookie-based session management for MovieBox API authentication
+- CORS-enabled for cross-origin requests
 
 **Application Structure**
-- Entry point: `index.js` containing the main application logic
-- Synchronous execution model with direct console output
-- No modular architecture or separation of concerns implemented
+- Entry point: `index.js` containing the complete Express server
+- Single-file architecture with all routes and middleware
+- Asynchronous request handling with proper error management
+- Session cookies managed via tough-cookie and axios-cookiejar-support
+
+**API Endpoints**
+- `GET /` - Health check and API documentation
+- `GET /api/homepage` - Homepage content from MovieBox
+- `GET /api/trending` - Trending movies and TV series
+- `GET /api/search/:query` - Search for movies and TV series
+- `GET /api/info/:movieId` - Detailed movie/series information
+- `GET /api/sources/:movieId` - Streaming sources and download links
 
 **Design Principles**
-- Minimalist approach with no abstraction layers
-- Direct execution without configuration files or build processes
-- Suitable for educational purposes or as a starting point for larger applications
+- Converted from Python moviebox-api to JavaScript/Express
+- Maintains API compatibility with original library functionality
+- Proper authentication flow with MovieBox backend services
+- Error handling with detailed status responses
 
 ## External Dependencies
 
 **Runtime Dependencies**
-- Node.js runtime environment (no specific version constraints identified)
+- Node.js 20.x runtime environment
+- Express.js 4.19.2 web framework
+- Axios for HTTP requests with cookie jar support
+- Cheerio for potential HTML parsing
+- tough-cookie and axios-cookiejar-support for session management
 
 **Third-party Services**
-- None currently integrated
+- MovieBox API backend (multiple mirror hosts supported)
+- Configured to use moviebox.pk as primary host
 
 **Development Tools**
-- No build tools, package managers, or development dependencies configured
-- No testing frameworks or linting tools present
+- npm package manager for dependency management
+- Replit workflows for server management
 
 **Database/Storage**
-- No data persistence mechanisms implemented
-- No database connections or file system operations
+- No local database - all data fetched from MovieBox API
+- Session cookies stored in memory for API authentication
+
+## Recent Changes
+
+**2025-01-20**: Successfully converted Python moviebox-api to JavaScript Express server
+- ✓ Implemented all major API endpoints (homepage, trending, search, info)
+- ✓ Added proper cookie-based authentication system
+- ✓ Configured multiple mirror hosts for redundancy
+- ✓ Working endpoints return real MovieBox data
+- → Sources endpoint experiencing 403 errors (likely due to enhanced API security)

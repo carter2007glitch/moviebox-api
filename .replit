@@ -15,27 +15,20 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Hello World App"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "hello_world_app"
+args = "MovieBox API Server"
 
 [[workflows.workflow]]
-name = "Hello World App"
+name = "MovieBox API Server"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node index.js"
+waitForPort = 5000
 
 [workflows.workflow.metadata]
-outputType = "console"
+outputType = "webview"
 
-[[workflows.workflow]]
-name = "hello_world_app"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node index.js"
+[[ports]]
+localPort = 5000
+externalPort = 80
