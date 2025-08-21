@@ -41,8 +41,12 @@ Get detailed information about a specific movie or TV series.
 ### Download Sources
 ```
 GET /api/sources/:movieId
+GET /api/sources/:movieId?season=1&episode=1
 ```
 Get real download links with multiple quality options. Returns both direct URLs and proxy URLs that work in browsers.
+
+**For Movies:** Use movie ID only  
+**For TV Episodes:** Add season and episode parameters
 
 **Response includes:**
 - Multiple video qualities (360p, 480p, 720p, 1080p)
@@ -50,8 +54,14 @@ Get real download links with multiple quality options. Returns both direct URLs 
 - Direct download URLs
 - Proxy URLs for browser compatibility
 
-**Example:**
-- `/api/sources/8906247916759695608` - Avatar download sources
+**Movie Examples:**
+- `/api/sources/8906247916759695608` - Avatar movie downloads
+- `/api/sources/3815343854912427320` - Spider-Man movie downloads
+
+**TV Episode Examples:**
+- `/api/sources/9028867555875774472?season=1&episode=1` - Wednesday S1E1
+- `/api/sources/9028867555875774472?season=1&episode=2` - Wednesday S1E2
+- `/api/sources/9028867555875774472?season=1&episode=3` - Wednesday S1E3
 
 ### Homepage Content
 ```
@@ -136,13 +146,23 @@ fetch('/api/info/8906247916759695608')
 
 ### Get Download Sources
 ```javascript
-// Get Avatar download links
+// Get Avatar movie download links
 fetch('/api/sources/8906247916759695608')
   .then(response => response.json())
   .then(data => {
     // Access both direct and proxy URLs
     data.data.processedSources.forEach(source => {
       console.log(`${source.quality}: ${source.proxyUrl}`);
+    });
+  });
+
+// Get TV episode download links (Wednesday Season 1 Episode 1)
+fetch('/api/sources/9028867555875774472?season=1&episode=1')
+  .then(response => response.json())
+  .then(data => {
+    // Access episode download sources
+    data.data.processedSources.forEach(source => {
+      console.log(`Episode S1E1 ${source.quality}: ${source.proxyUrl}`);
     });
   });
 ```
