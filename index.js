@@ -34,23 +34,34 @@ const MIRROR_HOSTS = [
     "netnaija.video"
 ];
 
-// Use the main host but with mobile app headers from PCAP analysis
+// Use different hosts for different endpoints - some mirrors work better for downloads
 const SELECTED_HOST = process.env.MOVIEBOX_API_HOST || "h5.aoneroom.com";
 const HOST_URL = `https://${SELECTED_HOST}`;
 
+// Alternative hosts for download endpoint
+const DOWNLOAD_MIRRORS = [
+    "moviebox.pk",
+    "moviebox.ph", 
+    "moviebox.id",
+    "v.moviebox.ph",
+    "h5.aoneroom.com"
+];
+
 // Updated headers based on mobile app traffic analysis from PCAP + region bypass
 const DEFAULT_HEADERS = {
-    'X-Client-Info': '{"timezone":"Africa/Nairobi"}',
+    'X-Client-Info': '{"timezone":"America/New_York"}',
     'Accept-Language': 'en-US,en;q=0.5',
     'Accept': 'application/json',
     'User-Agent': 'okhttp/4.12.0', // Mobile app user agent from PCAP
     'Referer': HOST_URL,
     'Host': SELECTED_HOST,
     'Connection': 'keep-alive',
-    // Add IP spoofing headers to bypass region restrictions
-    'X-Forwarded-For': '1.1.1.1',
-    'CF-Connecting-IP': '1.1.1.1',
-    'X-Real-IP': '1.1.1.1'
+    // Enhanced region bypass headers
+    'X-Forwarded-For': '8.8.8.8',
+    'CF-Connecting-IP': '8.8.8.8',
+    'X-Real-IP': '8.8.8.8',
+    'CF-IPCountry': 'US',
+    'CloudFront-Viewer-Country': 'US'
 };
 
 // Subject types
@@ -461,6 +472,18 @@ app.get('/api/search/:query', async (req, res) => {
             content.items = content.items.filter(item => item.subjectType === subjectType);
         }
         
+        // Enhance each item with easily accessible thumbnail
+        if (content.items) {
+            content.items.forEach(item => {
+                if (item.cover && item.cover.url) {
+                    item.thumbnail = item.cover.url;
+                }
+                if (item.stills && item.stills.url && !item.thumbnail) {
+                    item.thumbnail = item.stills.url;
+                }
+            });
+        }
+        
         res.json({
             status: 'success',
             data: content
@@ -486,6 +509,16 @@ app.get('/api/info/:movieId', async (req, res) => {
         });
         
         const content = processApiResponse(response);
+        
+        // Add easily accessible thumbnail URLs
+        if (content.subject) {
+            if (content.subject.cover && content.subject.cover.url) {
+                content.subject.thumbnail = content.subject.cover.url;
+            }
+            if (content.subject.stills && content.subject.stills.url && !content.subject.thumbnail) {
+                content.subject.thumbnail = content.subject.stills.url;
+            }
+        }
         
         res.json({
             status: 'success',
@@ -536,21 +569,89 @@ app.get('/api/sources/:movieId', async (req, res) => {
             ep: episode
         };
         
-        // Try the original endpoint with region bypass headers
-        const response = await makeApiRequestWithCookies(`${HOST_URL}/wefeed-h5-bff/web/subject/download`, {
-            method: 'GET',
-            params,
-            headers: {
-                'Referer': refererUrl,
-                'Origin': 'https://fmoviesunblocked.net',
-                // Add region bypass headers
-                'X-Forwarded-For': '1.1.1.1',
-                'CF-Connecting-IP': '1.1.1.1',
-                'X-Real-IP': '1.1.1.1'
-            }
-        });
+        // Enhanced sources request with improved region bypass
+        const enhancedHeaders = {
+            'Referer': refererUrl,
+            'Origin': 'https://fmoviesunblocked.net',
+            // Enhanced region bypass headers
+            'X-Forwarded-For': '8.8.8.8',
+            'CF-Connecting-IP': '8.8.8.8',
+            'X-Real-IP': '8.8.8.8',
+            'CF-IPCountry': 'US',
+            'CloudFront-Viewer-Country': 'US',
+            'X-Client-Info': '{"timezone":"America/New_York"}'
+        };
         
-        const content = processApiResponse(response);
+        let response;
+        let content = null;
+        
+        // Try multiple mirror hosts for download sources
+        let lastError = null;
+        
+        for (const mirror of DOWNLOAD_MIRRORS) {
+            try {
+                console.log(`Trying mirror: ${mirror}`);
+                const mirrorUrl = `https://${mirror}`;
+                
+                response = await axiosInstance({
+                    method: 'GET',
+                    url: `${mirrorUrl}/wefeed-h5-bff/web/subject/download`,
+                    params: params,
+                    headers: {
+                        ...DEFAULT_HEADERS,
+                        ...enhancedHeaders,
+                        'Host': mirror,
+                        'Referer': mirrorUrl
+                    },
+                    withCredentials: true
+                });
+                
+                content = processApiResponse(response);
+                console.log(`Success with mirror: ${mirror}`);
+                break; // Success, exit loop
+                
+            } catch (error) {
+                console.log(`Mirror ${mirror} failed: ${error.response?.status || error.message}`);
+                lastError = error;
+                
+                // For TV series, try alternative parameters on this mirror
+                if (season > 0) {
+                    try {
+                        const altParams = {
+                            subjectId: movieId,
+                            season: season,
+                            episode: episode
+                        };
+                        
+                        response = await axiosInstance({
+                            method: 'GET', 
+                            url: `${mirrorUrl}/wefeed-h5-bff/web/subject/download`,
+                            params: altParams,
+                            headers: {
+                                ...DEFAULT_HEADERS,
+                                ...enhancedHeaders,
+                                'Host': mirror,
+                                'Referer': mirrorUrl
+                            },
+                            withCredentials: true
+                        });
+                        
+                        content = processApiResponse(response);
+                        console.log(`Success with mirror ${mirror} using alternative params`);
+                        break; // Success, exit loop
+                        
+                    } catch (altError) {
+                        console.log(`Alternative params also failed on ${mirror}`);
+                        lastError = altError;
+                    }
+                }
+                continue; // Try next mirror
+            }
+        }
+        
+        if (!content) {
+            throw lastError || new Error('All mirror hosts failed');
+        }
         
         // Process the sources to extract direct download links with proxy URLs
         if (content && content.downloads) {
