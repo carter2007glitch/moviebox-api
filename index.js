@@ -373,20 +373,36 @@ app.get('/', (req, res) => {
             </div>
             
             <div class="endpoint">
+                <h3>📺 Video Streaming</h3>
+                <p>Stream videos with full seeking and playback support. Handles HTTP range requests for smooth playback.</p>
+                <span class="status">WORKING</span>
+                <br><br>
+                <p><strong>Usage:</strong> <code>/api/stream?url=[encoded-video-url]</code></p>
+                <p><strong>Features:</strong></p>
+                <ul style="color: #666; padding-left: 20px;">
+                    <li>Full video streaming with range request support (HTTP 206)</li>
+                    <li>Seeking and skipping without buffering issues</li>
+                    <li>Proper Content-Type, Content-Length, and Accept-Ranges headers</li>
+                    <li>Compatible with HTML5 video players</li>
+                </ul>
+                <p><small>Note: Stream URLs are automatically provided in the sources endpoint response</small></p>
+            </div>
+            
+            <div class="endpoint">
                 <h3>⚡ Download Proxy</h3>
                 <p>Proxy endpoint that adds proper headers to bypass CDN restrictions for direct downloads.</p>
                 <span class="status">WORKING</span>
                 <br><br>
                 <p><strong>Usage:</strong> <code>/api/download/[encoded-video-url]</code></p>
-                <p><small>Note: Video URLs are automatically provided in the sources endpoint response</small></p>
+                <p><small>Note: Download URLs are automatically provided in the sources endpoint response</small></p>
             </div>
             
             <div style="text-align: center; margin-top: 30px; padding: 20px; background: #f7fafc; border-radius: 10px;">
                 <h3 style="color: #2d3748; margin-bottom: 10px;">API Status</h3>
-                <p><strong>All 6 endpoints operational</strong> with real MovieBox data</p>
+                <p><strong>All 7 endpoints operational</strong> with real MovieBox data</p>
                 <p style="color: #666; font-size: 0.9em; margin-top: 10px;">
                     Successfully converted from Python moviebox-api to JavaScript Express server<br>
-                    with region bypass and mobile authentication headers
+                    with region bypass, mobile authentication headers, and video streaming support
                 </p>
             </div>
         </div>
@@ -590,13 +606,14 @@ app.get('/api/sources/:movieId', async (req, res) => {
         
         const content = processApiResponse(response);
         
-        // Process the sources to extract direct download links with proxy URLs
+        // Process the sources to extract direct download links with proxy URLs and stream URLs
         if (content && content.downloads) {
             const sources = content.downloads.map(file => ({
                 id: file.id,
                 quality: file.resolution || 'Unknown',
                 directUrl: file.url, // Original URL (blocked in browser)
-                proxyUrl: `${req.protocol}://${req.get('host')}/api/download/${encodeURIComponent(file.url)}`, // Proxied URL with proper headers
+                downloadUrl: `${req.protocol}://${req.get('host')}/api/download/${encodeURIComponent(file.url)}`, // Proxied download URL with proper headers
+                streamUrl: `${req.protocol}://${req.get('host')}/api/stream?url=${encodeURIComponent(file.url)}`, // Streaming URL with range support
                 size: file.size,
                 format: 'mp4'
             }));
@@ -615,6 +632,169 @@ app.get('/api/sources/:movieId', async (req, res) => {
             message: 'Failed to fetch streaming sources',
             error: error.message
         });
+    }
+});
+
+// Streaming proxy endpoint - handles range requests for video playback with seeking support
+app.get('/api/stream', async (req, res) => {
+    try {
+        // Express already decodes query params, so use req.query.url directly to avoid double-decoding
+        const streamUrl = req.query.url || '';
+        
+        if (!streamUrl || (!streamUrl.startsWith('https://bcdnw.hakunaymatata.com/') && !streamUrl.startsWith('https://valiw.hakunaymatata.com/'))) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Invalid stream URL'
+            });
+        }
+        
+        console.log(`Streaming video: ${streamUrl.substring(0, 100)}...`);
+        
+        // Check if client sent a Range header for seeking/partial content
+        const range = req.headers.range;
+        
+        // Get the file size - try HEAD first, fallback to GET if HEAD fails
+        let fileSize;
+        let contentType = 'video/mp4';
+        
+        try {
+            const headResponse = await axios({
+                method: 'HEAD',
+                url: streamUrl,
+                headers: {
+                    'User-Agent': 'okhttp/4.12.0',
+                    'Referer': 'https://fmoviesunblocked.net/',
+                    'Origin': 'https://fmoviesunblocked.net'
+                }
+            });
+            
+            fileSize = parseInt(headResponse.headers['content-length']);
+            contentType = headResponse.headers['content-type'] || contentType;
+        } catch (headError) {
+            console.log('HEAD request failed, will use GET with range to determine size');
+            // If HEAD fails, we'll get size from the first GET request
+            const testResponse = await axios({
+                method: 'GET',
+                url: streamUrl,
+                responseType: 'stream',
+                headers: {
+                    'User-Agent': 'okhttp/4.12.0',
+                    'Referer': 'https://fmoviesunblocked.net/',
+                    'Origin': 'https://fmoviesunblocked.net',
+                    'Range': 'bytes=0-0'
+                }
+            });
+            
+            // Destroy the stream immediately since we just needed the headers
+            testResponse.data.destroy();
+            
+            // Parse Content-Range to get file size (format: "bytes 0-0/12345")
+            const contentRange = testResponse.headers['content-range'];
+            if (contentRange) {
+                const match = contentRange.match(/bytes \d+-\d+\/(\d+)/);
+                if (match) {
+                    fileSize = parseInt(match[1]);
+                }
+            }
+            
+            contentType = testResponse.headers['content-type'] || contentType;
+        }
+        
+        if (!fileSize || isNaN(fileSize)) {
+            throw new Error('Could not determine file size');
+        }
+        
+        if (range) {
+            // Parse range header with validation
+            const parts = range.replace(/bytes=/, '').split('-');
+            let start = parseInt(parts[0], 10);
+            let end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            
+            // Handle suffix-byte-range (e.g., "bytes=-500" means last 500 bytes)
+            if (isNaN(start) && !isNaN(end)) {
+                start = fileSize - end;
+                end = fileSize - 1;
+            }
+            
+            // Validate range
+            if (isNaN(start) || isNaN(end) || start < 0 || end >= fileSize || start > end) {
+                return res.status(416).set({
+                    'Content-Range': `bytes */${fileSize}`
+                }).json({
+                    status: 'error',
+                    message: 'Range not satisfiable'
+                });
+            }
+            
+            const chunkSize = (end - start) + 1;
+            
+            console.log(`Range request: bytes ${start}-${end}/${fileSize}`);
+            
+            // Make request with Range header to CDN
+            const response = await axios({
+                method: 'GET',
+                url: streamUrl,
+                responseType: 'stream',
+                headers: {
+                    'User-Agent': 'okhttp/4.12.0',
+                    'Referer': 'https://fmoviesunblocked.net/',
+                    'Origin': 'https://fmoviesunblocked.net',
+                    'Range': `bytes=${start}-${end}`
+                }
+            });
+            
+            // Set 206 Partial Content headers
+            res.status(206);
+            res.set({
+                'Content-Type': contentType,
+                'Content-Length': chunkSize,
+                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Cache-Control': 'no-cache'
+            });
+            
+            // Pipe the video stream chunk to the response
+            response.data.pipe(res);
+            
+        } else {
+            // No range request, stream the entire file
+            console.log(`Streaming full file: ${fileSize} bytes`);
+            
+            const response = await axios({
+                method: 'GET',
+                url: streamUrl,
+                responseType: 'stream',
+                headers: {
+                    'User-Agent': 'okhttp/4.12.0',
+                    'Referer': 'https://fmoviesunblocked.net/',
+                    'Origin': 'https://fmoviesunblocked.net'
+                }
+            });
+            
+            // Set full content headers
+            res.status(200);
+            res.set({
+                'Content-Type': contentType,
+                'Content-Length': fileSize,
+                'Accept-Ranges': 'bytes',
+                'Cache-Control': 'no-cache'
+            });
+            
+            // Pipe the video stream to the response
+            response.data.pipe(res);
+        }
+        
+    } catch (error) {
+        console.error('Streaming proxy error:', error.message);
+        
+        // Send error only if headers haven't been sent
+        if (!res.headersSent) {
+            res.status(500).json({
+                status: 'error',
+                message: 'Failed to stream video',
+                error: error.message
+            });
+        }
     }
 });
 
