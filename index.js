@@ -608,15 +608,34 @@ app.get('/api/sources/:movieId', async (req, res) => {
         
         // Process the sources to extract direct download links with proxy URLs and stream URLs
         if (content && content.downloads) {
-            const sources = content.downloads.map(file => ({
-                id: file.id,
-                quality: file.resolution || 'Unknown',
-                directUrl: file.url, // Original URL (blocked in browser)
-                downloadUrl: `${req.protocol}://${req.get('host')}/api/download/${encodeURIComponent(file.url)}`, // Proxied download URL with proper headers
-                streamUrl: `${req.protocol}://${req.get('host')}/api/stream?url=${encodeURIComponent(file.url)}`, // Streaming URL with range support
-                size: file.size,
-                format: 'mp4'
-            }));
+            // Extract title information
+            const title = movieInfo?.subject?.title || 'video';
+            const isEpisode = season > 0 && episode > 0;
+            
+            const sources = content.downloads.map(file => {
+                // Build download URL with metadata for proper filename
+                const downloadParams = new URLSearchParams({
+                    url: file.url,
+                    title: title,
+                    quality: file.resolution || 'Unknown'
+                });
+                
+                // Add season/episode info if it's a TV show
+                if (isEpisode) {
+                    downloadParams.append('season', season);
+                    downloadParams.append('episode', episode);
+                }
+                
+                return {
+                    id: file.id,
+                    quality: file.resolution || 'Unknown',
+                    directUrl: file.url, // Original URL (blocked in browser)
+                    downloadUrl: `${req.protocol}://${req.get('host')}/api/download?${downloadParams.toString()}`, // Proxied download URL with metadata
+                    streamUrl: `${req.protocol}://${req.get('host')}/api/stream?url=${encodeURIComponent(file.url)}`, // Streaming URL with range support
+                    size: file.size,
+                    format: 'mp4'
+                };
+            });
             
             content.processedSources = sources;
         }
@@ -798,10 +817,24 @@ app.get('/api/stream', async (req, res) => {
     }
 });
 
+// Helper function to sanitize filename
+function sanitizeFilename(filename) {
+    // Remove or replace invalid filename characters
+    return filename
+        .replace(/[<>:"/\\|?*]/g, '') // Remove invalid characters
+        .replace(/\s+/g, '_') // Replace spaces with underscores
+        .replace(/_{2,}/g, '_') // Replace multiple underscores with single
+        .trim();
+}
+
 // Download proxy endpoint - adds proper headers to bypass CDN restrictions
-app.get('/api/download/*', async (req, res) => {
+app.get('/api/download', async (req, res) => {
     try {
-        const downloadUrl = decodeURIComponent(req.url.replace('/api/download/', '')); // Get and decode the URL
+        const downloadUrl = req.query.url;
+        const title = req.query.title || 'video';
+        const season = req.query.season;
+        const episode = req.query.episode;
+        const quality = req.query.quality || '';
         
         if (!downloadUrl || (!downloadUrl.startsWith('https://bcdnw.hakunaymatata.com/') && !downloadUrl.startsWith('https://valiw.hakunaymatata.com/'))) {
             return res.status(400).json({
@@ -810,7 +843,24 @@ app.get('/api/download/*', async (req, res) => {
             });
         }
         
+        // Build filename from metadata
+        let filename = sanitizeFilename(title);
+        
+        // Add season and episode if available (TV shows)
+        if (season && episode) {
+            filename += `_S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+        }
+        
+        // Add quality if available
+        if (quality) {
+            filename += `_${quality}`;
+        }
+        
+        // Add file extension
+        filename += '.mp4';
+        
         console.log(`Proxying download: ${downloadUrl}`);
+        console.log(`Filename: ${filename}`);
         
         // Make request with proper headers that allow CDN access
         const response = await axios({
@@ -824,11 +874,11 @@ app.get('/api/download/*', async (req, res) => {
             }
         });
         
-        // Forward the content-type and other relevant headers
+        // Forward the content-type and other relevant headers with custom filename
         res.set({
             'Content-Type': response.headers['content-type'],
             'Content-Length': response.headers['content-length'],
-            'Content-Disposition': `attachment; filename="movie.mp4"`
+            'Content-Disposition': `attachment; filename="${filename}"`
         });
         
         // Pipe the video stream to the response

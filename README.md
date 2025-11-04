@@ -77,9 +77,15 @@ Get currently trending movies and TV series with real-time data.
 
 ### Download Proxy
 ```
-GET /api/download/[encoded-video-url]
+GET /api/download?url=[video-url]&title=[title]&quality=[quality]&season=[season]&episode=[episode]
 ```
-Proxy endpoint that adds proper headers to bypass CDN restrictions for direct downloads. Video URLs are automatically provided in the sources endpoint response.
+Proxy endpoint that adds proper headers to bypass CDN restrictions for direct downloads. Automatically generates descriptive filenames based on metadata.
+
+**Filename Format:**
+- **Movies:** `Title_Quality.mp4` (e.g., `Avatar_1080p.mp4`)
+- **TV Shows:** `Title_S01E01_Quality.mp4` (e.g., `Wednesday_S01E01_1080p.mp4`)
+
+**Note:** Download URLs with proper metadata are automatically generated in the sources endpoint response.
 
 ## Installation
 
@@ -120,6 +126,7 @@ The API will be available at `http://localhost:5000`
 - Automatic header injection for CDN access
 - Stream-based proxying for large video files
 - Bypasses browser restrictions with proper referer headers
+- Descriptive filenames with title, season, episode, and quality information
 
 ### API Compatibility
 - Maintains compatibility with original Python moviebox-api
