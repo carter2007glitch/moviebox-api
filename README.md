@@ -124,9 +124,11 @@ The API will be available at `http://localhost:5000`
 
 ### Download Proxy
 - Automatic header injection for CDN access
-- Stream-based proxying for large video files
+- Stream-based proxying for large video files (no timeout limits)
 - Bypasses browser restrictions with proper referer headers
 - Descriptive filenames with title, season, episode, and quality information
+- HTTPS URL generation for secure downloads
+- Proper error handling and stream cleanup for interrupted downloads
 
 ### API Compatibility
 - Maintains compatibility with original Python moviebox-api

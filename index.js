@@ -612,6 +612,11 @@ app.get('/api/sources/:movieId', async (req, res) => {
             const title = movieInfo?.subject?.title || 'video';
             const isEpisode = season > 0 && episode > 0;
             
+            // Detect proper protocol (handle reverse proxies like Koyeb)
+            // Default to HTTPS for security
+            const protocol = req.get('x-forwarded-proto') || (req.protocol === 'https' ? 'https' : 'https');
+            const baseUrl = `${protocol}://${req.get('host')}`;
+            
             const sources = content.downloads.map(file => {
                 // Build download URL with metadata for proper filename
                 const downloadParams = new URLSearchParams({
@@ -630,8 +635,8 @@ app.get('/api/sources/:movieId', async (req, res) => {
                     id: file.id,
                     quality: file.resolution || 'Unknown',
                     directUrl: file.url, // Original URL (blocked in browser)
-                    downloadUrl: `${req.protocol}://${req.get('host')}/api/download?${downloadParams.toString()}`, // Proxied download URL with metadata
-                    streamUrl: `${req.protocol}://${req.get('host')}/api/stream?url=${encodeURIComponent(file.url)}`, // Streaming URL with range support
+                    downloadUrl: `${baseUrl}/api/download?${downloadParams.toString()}`, // Proxied download URL with metadata
+                    streamUrl: `${baseUrl}/api/stream?url=${encodeURIComponent(file.url)}`, // Streaming URL with range support
                     size: file.size,
                     format: 'mp4'
                 };
@@ -863,10 +868,14 @@ app.get('/api/download', async (req, res) => {
         console.log(`Filename: ${filename}`);
         
         // Make request with proper headers that allow CDN access
+        // No timeout for large file downloads
         const response = await axios({
             method: 'GET',
             url: downloadUrl,
             responseType: 'stream',
+            timeout: 0, // Disable timeout for large files
+            maxContentLength: Infinity,
+            maxBodyLength: Infinity,
             headers: {
                 'User-Agent': 'okhttp/4.12.0',
                 'Referer': 'https://fmoviesunblocked.net/',
@@ -881,7 +890,23 @@ app.get('/api/download', async (req, res) => {
             'Content-Disposition': `attachment; filename="${filename}"`
         });
         
-        // Pipe the video stream to the response
+        // Pipe the video stream to the response with error handling
+        response.data.on('error', (error) => {
+            console.error('Download stream error:', error.message);
+            if (!res.headersSent) {
+                res.status(500).json({
+                    status: 'error',
+                    message: 'Download stream failed',
+                    error: error.message
+                });
+            }
+        });
+        
+        res.on('close', () => {
+            console.log('Client closed connection');
+            response.data.destroy();
+        });
+        
         response.data.pipe(res);
         
     } catch (error) {
