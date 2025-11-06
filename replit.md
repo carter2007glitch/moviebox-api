@@ -59,6 +59,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**2025-11-06**: Cloudflare Workers version created for optimal large file streaming
+- ✓ Created production-ready Cloudflare Workers implementation (worker.js)
+- ✓ Implemented proper HTTP range request support for resumable downloads
+- ✓ Fixed cookie handling to properly extract name=value pairs from Set-Cookie headers
+- ✓ Added streaming support without memory buffering for files of any size
+- ✓ Both /api/stream and /api/download now support pause/resume functionality
+- ✓ No timeout limits - downloads run as long as client stays connected
+- ✓ Configuration file (wrangler.toml) created for easy deployment
+- ✓ Comprehensive deployment documentation added to README
+- ✅ CLOUDFLARE READY: Optimized for large file downloads with resumable support
+
 **2025-01-20**: Successfully completed full Python moviebox-api to JavaScript conversion
 - ✓ All 6 API endpoints fully functional with real MovieBox data
 - ✓ Sources endpoint breakthrough: Region bypass headers implemented successfully
