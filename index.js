@@ -302,7 +302,7 @@ app.get('/', (req, res) => {
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎬 MovieBox API</h1>
+            <h1>🎬 Glitch Movies Download API </h1>
             <p>Complete access to movies, TV series, and streaming sources</p>
         </div>
         
